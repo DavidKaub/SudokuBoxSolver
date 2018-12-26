@@ -4,10 +4,14 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-public class NetworkHandler {
+public class NetworkHandler extends Thread{
 
     private SudokuBox sudokuBox;
-    ManagerConnection managerConnection;
+
+    private String boxManagerUri;
+    private int boxManagerPort;
+
+    private ManagerConnection managerConnection;
     private Map<String, NeighborConnection> neighborConnections;
     private List<String> incommingMessages;
     private List<String> outgoingMessages;
@@ -16,10 +20,51 @@ public class NetworkHandler {
 
 
 
-    public NetworkHandler(SudokuBox sudokuBox, ManagerConnection managerConnection){
+    public NetworkHandler(SudokuBox sudokuBox, String boxManagerUri, int boxManagerPort){
         this.sudokuBox = sudokuBox;
-       // managerConnection = ManagerConnection.getInstance(sudokuBox.getManagerUri(), sudokuBox.getManagerPort());
+        try {
+            System.out.println("establishing connection to boxManager: "+boxManagerUri+":"+boxManagerPort);
+            this.managerConnection = new ManagerConnection(sudokuBox,boxManagerUri,boxManagerPort);
+            /**
+             * TODO Should logon server and ask for neighbor adresses! asap
+             * when all neighbor connections are established the sudokubox is beeing
+             * "started"! i.e. messages are sent and received
+             *
+             */
+            managerConnection.start();
+            managerConnection.registerOnManager();
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            for(String neighborName: sudokuBox.getNeighborNames()){
+                System.out.println("Askibg for neighbor "+ neighborName);
+                managerConnection.sendMessage(neighborName);
+                //the neighbor connections should get established during the run method
+                // receiving the data from the server
+            }
+
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        // managerConnection = ManagerConnection.getInstance(sudokuBox.getManagerUri(), sudokuBox.getManagerPort());
         //TODO
+
+    }
+
+    @Override
+    public void run(){
+
+
+
+        while (true){
+
+        }
+
+
 
     }
 
