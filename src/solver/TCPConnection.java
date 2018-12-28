@@ -30,9 +30,9 @@ public class TCPConnection extends Thread {
     }
 
     protected boolean sendMessage(String message) throws IOException {
+        //System.out.println("sending message "+message);
         this.bufferedWriter.write(message + "\n");
         this.bufferedWriter.flush();
-        System.out.println("Message flushed!");
         return true;
     }
 

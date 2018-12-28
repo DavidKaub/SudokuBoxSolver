@@ -7,14 +7,13 @@ import java.util.List;
 
 public class NeighborConnection extends TCPConnection{
 
-    private List<String> incomingMessages;
+
     private List<String> messageHistory;
     private NetworkHandler networkHandler;
 
 
     public NeighborConnection(Socket socket, NetworkHandler networkHandler){
         super(socket);
-        this.incomingMessages = new ArrayList<>();
         this.messageHistory = new ArrayList<>();
         this.networkHandler = networkHandler;
     }
@@ -34,17 +33,16 @@ public class NeighborConnection extends TCPConnection{
 
     @Override
     public void run(){
-        // receive messages from neighbor and write those to the incoming message list through the message handler object
+         // receive messages from neighbor and write those to the incoming message list through the message handler object
         try {
             while(true) {
                 String line = this.readLine();
                 if (line != null) {
                     line = line.trim();
-                    System.out.println("Received message: " + line);
-                    synchronized (incomingMessages){
-                        incomingMessages.add(line);
+                    //System.out.println("Received message: " + line);
+                    synchronized (networkHandler){
+                        networkHandler.addIncomingMessage(line);
                     }
-
                 } else {
                     break;
                 }
@@ -55,10 +53,5 @@ public class NeighborConnection extends TCPConnection{
             ex.printStackTrace();
         }
 
-    }
-    public List<String> getIncomingMessages(){
-        synchronized(incomingMessages) {
-            return incomingMessages;
-        }
     }
 }

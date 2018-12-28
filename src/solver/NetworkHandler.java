@@ -39,11 +39,9 @@ public class NetworkHandler extends Thread {
         boxPort = tcpServer.getLocalPort();
         tcpServer.start();
         establishConnectionToManager(boxManagerUri, boxManagerPort);
+        //sudokuBox.sendInitialState();
     }
 
-    private void startLokalServer() {
-
-    }
 
     private void establishConnectionToManager(String boxManagerUri, int boxManagerPort) {
         try {
@@ -91,8 +89,8 @@ public class NetworkHandler extends Thread {
                 for (String message : incomingMessages) {
                     // give message to box
                     sudokuBox.receiveKnowledge(message);
-                    incomingMessages.remove(message);
                 }
+                incomingMessages.clear();
             }
             synchronized (this) {
                 sentPendingMessages();
@@ -132,11 +130,15 @@ public class NetworkHandler extends Thread {
  *
  */
         synchronized (outgoingNeighborConnections) {
-            if (!outgoingNeighborConnections.isEmpty()) {
+            if (outgoingNeighborConnections.size() == sudokuBox.getNeighborNames().size()) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 synchronized (outgoingMessages) {
                     for (String message : outgoingMessages) {
                         if (messageHistory.contains(message)) {
-                            outgoingMessages.remove(message);
                         } else {
                             for (NeighborConnection neighbor : outgoingNeighborConnections) {
                                 try {
@@ -145,24 +147,27 @@ public class NetworkHandler extends Thread {
                                     e.printStackTrace();
                                 }
                             }
-                            outgoingMessages.remove(message);
                             messageHistory.add(message);
                         }
                     }
+                    outgoingMessages.clear();
                 }
             }
         }
     }
 
-    public void addIncommingNeighborConnection(NeighborConnection neighborConnection) {
+
+    public void addIncomingNeighborConnection(NeighborConnection neighborConnection) {
         synchronized (incomingNeighborConnections) {
             incomingNeighborConnections.add(neighborConnection);
+            neighborConnection.start();
         }
     }
 
     public void addOutgoingNeighborConnection(NeighborConnection neighborConnection) {
         synchronized (outgoingNeighborConnections) {
             outgoingNeighborConnections.add(neighborConnection);
+            neighborConnection.start();
         }
     }
 

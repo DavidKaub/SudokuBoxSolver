@@ -1,7 +1,11 @@
 package solver;
+import Initializer.Debugger;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
-public class SudokuCell {
+class SudokuCell {
 
 
     private int columnInBox;
@@ -14,30 +18,23 @@ public class SudokuCell {
     private List<Integer> potetialFits;
 
 
-    public SudokuCell(SudokuBox parent, int columnInBox, int rowInBox, List<Integer> potentialFits){
+    SudokuCell(SudokuBox parent, int columnInBox, int rowInBox){
         this.parent = parent;
-        this.potetialFits = potentialFits;
+        List<Integer> list = new ArrayList<>();
+        list.addAll(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9));
+        this.potetialFits = list;
         isSolved = false;
         this.rowInBox = rowInBox;
         this.columnInBox = columnInBox;
         this.value = -1;
     }
 
-    public void setValue(int value) {
+    void setValue(int value) {
         this.value = value;
         isSolved = true;
         potetialFits = null;
-        informParent();
+        parent.receiveCellUpdate(this);
     }
-
-    public void informParent(){
-       parent.receiveLocalUpdate(this);
-        /**
-         * inform parent abount new state!
-         */
-
-    }
-
     private void update(){
         if(!isSolved){
             if(potetialFits.size() == 1){
@@ -46,16 +43,15 @@ public class SudokuCell {
         }
     }
 
-    public void addNewConstraint(int constraint){
-        //System.out.println("Cell "+getGlobalCellName()+ " receiving new constraint: "+constraint);
+    void addNewConstraint(int constraint){
         if(potetialFits != null && potetialFits.contains(constraint)){
-            //System.out.println("WOW Dude - I'm ("+getGlobalCellName()+")amazed to know about that!");
+            Debugger.__("Cell "+getGlobalCellName()+ " receiving new constraint: "+constraint, this);
             potetialFits.remove((Integer) constraint);
             update();
         }
     }
 
-    public String getGlobalCellName(){
+    String getGlobalCellName(){
         int charVal = Character.valueOf(parent.getColumn());
         charVal = charVal + getColumnInBox();
         char col = (char) charVal;
@@ -64,36 +60,21 @@ public class SudokuCell {
     }
 
 
-
-
-
-
-
-    public int getColumnInBox() {
+    int getColumnInBox() {
         return columnInBox;
     }
 
-    public int getRowInBox() {
+    int getRowInBox() {
         return rowInBox;
     }
 
-    public boolean isSolved() {
+    boolean isSolved() {
         update();
         return isSolved;
     }
 
-    public int getValue() {
+    int getValue() {
         return value;
     }
-
-    public SudokuBox getParent() {
-        return parent;
-    }
-
-    public List<Integer> getPotetialFits() {
-        return potetialFits;
-    }
-
-
 
 }

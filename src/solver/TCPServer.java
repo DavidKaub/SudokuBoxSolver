@@ -27,7 +27,7 @@ public class TCPServer extends Thread {
         while(true) {
             try {
                 NeighborConnection neighborConnection = new NeighborConnection(this.serverSocket.accept(), networkHandler);
-                this.networkHandler.addIncommingNeighborConnection(neighborConnection);
+                this.networkHandler.addIncomingNeighborConnection(neighborConnection);
             } catch (IOException e) {
                 e.printStackTrace();
             }
