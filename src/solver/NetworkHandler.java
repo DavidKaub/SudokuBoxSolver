@@ -13,10 +13,10 @@ public class NetworkHandler extends Thread {
     private TCPServer tcpServer;
 
     private ManagerConnection managerConnection;
-    private List<NeighborConnection> icomingNeighborConnections;
+    private List<NeighborConnection> incomingNeighborConnections;
     private List<NeighborConnection> outgoingNeighborConnections;
 
-    private List<String> incommingMessages;
+    private List<String> incomingMessages;
     private List<String> outgoingMessages;
     private List<String> messageHistory;
 
@@ -25,10 +25,10 @@ public class NetworkHandler extends Thread {
         this.sudokuBox = sudokuBox;
         this.boxName = sudokuBox.getBoxName();
 
-        icomingNeighborConnections = new ArrayList<>();
+        incomingNeighborConnections = new ArrayList<>();
         outgoingNeighborConnections = new ArrayList<>();
 
-        incommingMessages = new ArrayList<>();
+        incomingMessages = new ArrayList<>();
 
         outgoingMessages = new ArrayList<>();
         messageHistory = new ArrayList<>();
@@ -87,11 +87,11 @@ public class NetworkHandler extends Thread {
 
              */
 
-            synchronized (incommingMessages) {
-                for (String message : incommingMessages) {
+            synchronized (incomingMessages) {
+                for (String message : incomingMessages) {
                     // give message to box
                     sudokuBox.receiveKnowledge(message);
-                    incommingMessages.remove(message);
+                    incomingMessages.remove(message);
                 }
             }
             synchronized (this) {
@@ -107,8 +107,8 @@ public class NetworkHandler extends Thread {
 
 
     public void addIncomingMessage(String message) {
-        synchronized (incommingMessages) {
-            incommingMessages.add(message);
+        synchronized (incomingMessages) {
+            incomingMessages.add(message);
         }
     }
 
@@ -154,10 +154,9 @@ public class NetworkHandler extends Thread {
         }
     }
 
-
     public void addIncommingNeighborConnection(NeighborConnection neighborConnection) {
-        synchronized (icomingNeighborConnections) {
-            icomingNeighborConnections.add(neighborConnection);
+        synchronized (incomingNeighborConnections) {
+            incomingNeighborConnections.add(neighborConnection);
         }
     }
 
