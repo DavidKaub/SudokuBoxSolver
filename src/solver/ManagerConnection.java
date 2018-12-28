@@ -5,13 +5,17 @@ import java.net.InetAddress;
 import java.net.Socket;
 
 public class ManagerConnection extends TCPConnection {
-    private SudokuBox sudokuBox;
+    private NetworkHandler networkHandler;
+    private String localUri;
+    private int localPort;
 
-    public ManagerConnection(SudokuBox sudokuBox, String uri, int port) throws IOException {
-        super(new Socket(InetAddress.getByName(uri), port));
+    public ManagerConnection(NetworkHandler networkHandler, String remoteUri, int remotePort, String localUri, int localPort) throws IOException {
+        super(new Socket(InetAddress.getByName(remoteUri), remotePort));
+        this.localUri = localUri;
+        this.localPort = localPort;
 
         //new Socket(InetAddress.getByName(uri),port);
-        this.sudokuBox = sudokuBox;
+        this.networkHandler = networkHandler;
 
     }
 
@@ -35,10 +39,9 @@ public class ManagerConnection extends TCPConnection {
                             address = parts[0].trim();
                             port = Integer.parseInt(parts[1].trim());
                         }
-                        //TODO
-                        //Socket s = new Socket(address, port);
-                        //BoxNeighbourSocket neighbour = new BoxNeighbourSocket(s, this.box);
-                        //this.box.addNeighbour(neighbour);
+                        Socket socket = new Socket(address, port);
+                        NeighborConnection neighborConnection = new NeighborConnection(socket, networkHandler);
+                        networkHandler.addOutgoingNeighborConnection(neighborConnection);
                         System.out.println("Established connection with neighbour " + address + " on port " + port);
                     }
 
@@ -56,7 +59,7 @@ public class ManagerConnection extends TCPConnection {
     }
 
     public void registerOnManager(){
-        String registrationMessage = sudokuBox.getBoxName() + "," + sudokuBox.getBoxUri() + "," + sudokuBox.getBoxPort();
+        String registrationMessage = networkHandler.getBoxName() + "," + localUri + "," + localPort;
         System.out.println("Sending Message: "+registrationMessage);
         try {
             this.sendMessage(registrationMessage);

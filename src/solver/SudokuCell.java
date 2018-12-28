@@ -31,9 +31,7 @@ public class SudokuCell {
     }
 
     public void informParent(){
-
-        //TODO uncomment!
-       // parent.receiveLocalUpdate(this);
+       parent.receiveLocalUpdate(this);
         /**
          * inform parent abount new state!
          */

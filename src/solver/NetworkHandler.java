@@ -1,30 +1,54 @@
 package solver;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-public class NetworkHandler extends Thread{
+public class NetworkHandler extends Thread {
 
     private SudokuBox sudokuBox;
-
-    private String boxManagerUri;
-    private int boxManagerPort;
+    private String boxName;
+    private String boxUri;
+    private int boxPort;
+    private TCPServer tcpServer;
 
     private ManagerConnection managerConnection;
-    private Map<String, NeighborConnection> neighborConnections;
+    private List<NeighborConnection> icomingNeighborConnections;
+    private List<NeighborConnection> outgoingNeighborConnections;
+
     private List<String> incommingMessages;
     private List<String> outgoingMessages;
-    private List<String> sentMessages;
+    private List<String> messageHistory;
 
 
-
-
-    public NetworkHandler(SudokuBox sudokuBox, String boxManagerUri, int boxManagerPort){
+    public NetworkHandler(SudokuBox sudokuBox, String boxManagerUri, int boxManagerPort) {
         this.sudokuBox = sudokuBox;
+        this.boxName = sudokuBox.getBoxName();
+
+        icomingNeighborConnections = new ArrayList<>();
+        outgoingNeighborConnections = new ArrayList<>();
+
+        incommingMessages = new ArrayList<>();
+
+        outgoingMessages = new ArrayList<>();
+        messageHistory = new ArrayList<>();
+
+        //before establishing connection to remote server (manager) start local server to receive messages when registered
+        tcpServer = new TCPServer(this);
+        boxUri = tcpServer.getLocalIp();
+        boxPort = tcpServer.getLocalPort();
+        tcpServer.start();
+        establishConnectionToManager(boxManagerUri, boxManagerPort);
+    }
+
+    private void startLokalServer() {
+
+    }
+
+    private void establishConnectionToManager(String boxManagerUri, int boxManagerPort) {
         try {
-            System.out.println("establishing connection to boxManager: "+boxManagerUri+":"+boxManagerPort);
-            this.managerConnection = new ManagerConnection(sudokuBox,boxManagerUri,boxManagerPort);
+            System.out.println("establishing connection to boxManager: " + boxManagerUri + ":" + boxManagerPort);
+            this.managerConnection = new ManagerConnection(this, boxManagerUri, boxManagerPort, boxUri, boxPort);
             /**
              * TODO Should logon server and ask for neighbor adresses! asap
              * when all neighbor connections are established the sudokubox is beeing
@@ -38,82 +62,114 @@ public class NetworkHandler extends Thread{
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            for(String neighborName: sudokuBox.getNeighborNames()){
-                System.out.println("Askibg for neighbor "+ neighborName);
+            for (String neighborName : sudokuBox.getNeighborNames()) {
+                System.out.println("Asking for neighbor " + neighborName);
                 managerConnection.sendMessage(neighborName);
                 //the neighbor connections should get established during the run method
                 // receiving the data from the server
             }
 
 
-
         } catch (IOException e) {
             e.printStackTrace();
         }
-        // managerConnection = ManagerConnection.getInstance(sudokuBox.getManagerUri(), sudokuBox.getManagerPort());
-        //TODO
-
     }
+
 
     @Override
-    public void run(){
+    public void run() {
+        while (true) {
 
-
-
-        while (true){
-
-        }
-
-
-
-    }
-
-
-
-
-
-
-
-
-    private void sentMessages(){
-        for(String message: outgoingMessages){
-            if(sentMessages.contains(message)){
-                outgoingMessages.remove(message);
-            }else{
-                for(String neighborName: sudokuBox.getNeighborNames()){
-                    NeighborConnection n = retrieveNeighborConnection(neighborName);
-                    //TODO send messages
-                }
-                outgoingMessages.remove(message);
-                sentMessages.add(message);
-            }
-        }
-    }
-
-
-    private NeighborConnection retrieveNeighborConnection(String neighborName){
-        NeighborConnection neighborConnection = null;
-        if (neighborConnections.containsKey(neighborName)){
-            neighborConnection = neighborConnections.get(neighborName);
-        }else{
-            try {
-                managerConnection.sendMessage(neighborName);
-                //TODO PROBELM wegen drecks thread gedoens! hier muss die antwort ja irgendwie gefangen werden! d.h. sende wissen erst wenn alle nachbarn bekannt sind.==??
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            //TODO create new neighborProy
             /**
-             * TODO
-             * 1. Beziehe Verbindung zum BoxManager
-             * 2. Frage BoxManager nach der IP Adresse und dem Port des Nachbarn
-             * 3. Baue eine verbindung zum Server des Nachbarn auf znd psiecher diese als neighborConneciton
-             * 4. Speichere Verbindung in neighborConnections
-             * 5. (neighborConneciton wird außerhalb des "else" zurück gegeben)
+             * 1. Read messages from all incoming connections
+             * 3. feed the box with the new knowledge
+             *      b. this means also processing the boxes solving algorithm and retrieving new knowledge
+
              */
 
+            synchronized (incommingMessages) {
+                for (String message : incommingMessages) {
+                    // give message to box
+                    sudokuBox.receiveKnowledge(message);
+                    incommingMessages.remove(message);
+                }
+            }
+            synchronized (this) {
+                sentPendingMessages();
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
-        return neighborConnection;
+    }
+
+
+    public void addIncomingMessage(String message) {
+        synchronized (incommingMessages) {
+            incommingMessages.add(message);
+        }
+    }
+
+    public void addOutgoingMessage(String message) {
+        synchronized (outgoingMessages) {
+            outgoingMessages.add(message);
+        }
+    }
+
+
+    private void sentPendingMessages() {
+/**
+ * TODO Design
+ * in den ausgehgenden Verbindungen wird nochmals überprüft ob die nachrtichte bereits versendet wurde
+ * Wenn wir hier dieser Prüfung nicht stattfindet aber dafür in den einzelnen ist zwar der aufwand größer
+ * aber es kann auch ermöglicht werden (eher jedenfalls) dass während des prozesses einzelne Boxen ausgetauscht werden
+ *
+ * edit: das zentrale speichern der versendeten nachrichten ist sinvoll bzw notwendig um ggf die nachrichten nochmals
+ * zu versenden. Außerdem ist in der regal für die performance des systems ein lokaler zugriff deutlich günstiger
+ * als das versenden einer nachricht. d.h. lieber lokal doppelt prüfen anstatt unnötige naschrichten senden
+ *
+ */
+        synchronized (outgoingNeighborConnections) {
+            if (!outgoingNeighborConnections.isEmpty()) {
+                synchronized (outgoingMessages) {
+                    for (String message : outgoingMessages) {
+                        if (messageHistory.contains(message)) {
+                            outgoingMessages.remove(message);
+                        } else {
+                            for (NeighborConnection neighbor : outgoingNeighborConnections) {
+                                try {
+                                    neighbor.sendMessage(message);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                            outgoingMessages.remove(message);
+                            messageHistory.add(message);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    public void addIncommingNeighborConnection(NeighborConnection neighborConnection) {
+        synchronized (icomingNeighborConnections) {
+            icomingNeighborConnections.add(neighborConnection);
+        }
+    }
+
+    public void addOutgoingNeighborConnection(NeighborConnection neighborConnection) {
+        synchronized (outgoingNeighborConnections) {
+            outgoingNeighborConnections.add(neighborConnection);
+        }
+    }
+
+
+    public String getBoxName() {
+        return boxName;
     }
 
 }
