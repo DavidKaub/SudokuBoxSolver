@@ -77,4 +77,7 @@ class SudokuCell {
         return value;
     }
 
+    public List<Integer> getPotetialFits() {
+        return potetialFits;
+    }
 }

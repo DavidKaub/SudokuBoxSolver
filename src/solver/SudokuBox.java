@@ -6,30 +6,27 @@ import java.util.*;
 
 public class SudokuBox {
 
-
     private String boxName;
     private String boxUri;
     private char column;
     private int row;
-    private List<String> neighborNames;
 
-    private List<Integer> unusedValues;
-    private List<Integer> usedValues;
+    private List<String> neighborNames = new ArrayList<>();
+    private List<Integer> unusedValues = new ArrayList<>();
 
     private NetworkHandler networkHandler;
     private SudokuCell[][] boxCells;
-    private boolean isSolved;
-
+    private boolean isSolved = false;
 
     //TODO potential solving optimization with map?
-    private Map<Integer, List<SudokuCell>> potentialNumberPositions;
+    private Map<Integer, List<SudokuCell>> potentialNumberPositions = new HashMap<>();
 
 
     public SudokuBox(String boxName, String uri, String boxManagerUri, int boxManagerPort, String initialValues) {
         this.boxName = boxName;
         this.boxUri = uri;
-        this.isSolved = false;
 
+        unusedValues.addAll(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9));
         StringTokenizer stringTokenizer = new StringTokenizer(boxName, "_");
         stringTokenizer.nextToken();
         String boxColRow = stringTokenizer.nextToken();
@@ -37,10 +34,12 @@ public class SudokuBox {
         column = Character.toUpperCase(column);
         row = Integer.parseInt("" + boxColRow.charAt(1));
 
-        neighborNames = new ArrayList<>();
-        unusedValues = new ArrayList<>();
-        unusedValues.addAll(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9));
-        usedValues = new ArrayList<>();
+
+        //Initialize Map
+        for (int i = 1; i <= 9; i++) {
+            potentialNumberPositions.put(i, new ArrayList<>());
+        }
+
 
         initializeCells();
 
@@ -49,9 +48,15 @@ public class SudokuBox {
 
         setInitialValues(initialValues);
         Debugger.__("initialized!", this);
-        Debugger.__(this.toString(),this);
+        Debugger.__(this.toString(), this);
         fireLocalUpdate();
         sendInitialState();
+    }
+
+    private void clearMapLists() {
+        for (int i = 1; i <= 9; i++) {
+            potentialNumberPositions.get((Integer) i).clear();
+        }
     }
 
 
@@ -63,17 +68,72 @@ public class SudokuBox {
              * If a number is only counted once -> the cell can be solved
              */
 
+            //1. part of "smart" solving
+            clearMapLists();
+            //end 1 part
 
             for (int i = 0; i < boxCells.length; i++) {
                 for (int j = 0; j < boxCells[i].length; j++) {
                     SudokuCell cell = boxCells[i][j];
+
                     if (cell.isSolved() && unusedValues.contains(cell.getValue())) {
                         removeAvailableValueFromBox(cell.getValue());
+                    }
+
+                    //2. part of "smart" solving
+                    if (!cell.isSolved() && unusedValues.size() > 1) {
+                        /**
+                         * wir haben hier eine Map die für jeden möglichen Wert die besetzbaren Zellen speichert (in einer Liste)
+                         * Wenn eine der Listen die Länge 1 hat kann der Wert gesetzt werden ( ein Wert kann nur an einer
+                         * bestimmten stelle gesetzt werden (!= eine Zelle kann nur noch einen bestimmten wert haben))
+                         *
+                         * Koennte noch optimeirt werden wenn man außer der Box noch die Constraints angrenzender Boxen bzw. der
+                         * korrespondierenden Reiehen und spalten berücksichjtrigt
+                         *
+                         */
+
+                        for(Integer val: cell.getPotetialFits()){
+                            potentialNumberPositions.get((Integer) val).add(cell);
+                        }
+                    }
+                    //end 2 part
+                }
+            }
+
+            //3. part of "smart" solving
+            if (unusedValues.size() > 1) {
+                for(Map.Entry<Integer, List<SudokuCell>> entry : potentialNumberPositions.entrySet()) {
+                    List<SudokuCell> list = entry.getValue();
+                    if(list.size() == 1){
+                        Integer key = entry.getKey();
+                        SudokuCell localCell = list.get(0);
+                        System.out.println("Found Value: "+key + " for cell "+localCell.getGlobalCellName());
+                        System.out.println("Existing Potential Values = ");
+                        System.out.println(localCell.getPotetialFits().toString());
+                        //System.exit(0);
+                    }
+                }
+            }
+            //end of 3. part
+
+            if (unusedValues.size() == 1) {
+                /**
+                 * if only one value is not used that can be easily set to the (last) unsolved cell.
+                 * should actually not occur because the constraints should have been propagated and the
+                 * cell should have solved itself
+                 */
+
+                for (int i = 0; i < boxCells.length; i++) {
+                    for (int j = 0; j < boxCells[i].length; j++) {
+                        SudokuCell cell = boxCells[i][j];
+                        if (!cell.isSolved()) {
+                            cell.setValue(unusedValues.get(0));
+                        }
                     }
                 }
             }
             if (unusedValues.size() == 0) {
-                Debugger.__(getBoxName() + " is solved!",this);
+                Debugger.__(getBoxName() + " is solved!", this);
                 this.isSolved = true;
             }
         }
@@ -82,16 +142,16 @@ public class SudokuBox {
 
     public void receiveCellUpdate(SudokuCell cell) {
         if (!isSolved) {
-            Debugger.__("local update received",this);
+            Debugger.__("local update received", this);
             if (cell.isSolved() && unusedValues.contains(cell.getValue())) {
-                Debugger.__(boxName + " found new value at cell " + cell.getGlobalCellName() + " value = " + cell.getValue(),this);
+                Debugger.__(boxName + " found new value at cell " + cell.getGlobalCellName() + " value = " + cell.getValue(), this);
                 removeAvailableValueFromBox(cell.getValue());
                 /**
                  * informiere alle zellen die noch nicht geloesst sind darüber, dass der wert nicht mehr verfügbar ist
                  */
                 fireLocalUpdate();
                 sendNewKnowledgeToNeighbors(cell);
-                Debugger.__(this.toString(),this);
+                Debugger.__(this.toString(), this);
             }
         }
     }
@@ -103,13 +163,12 @@ public class SudokuBox {
 
     private void sendNewKnowledgeToNeighbors(String message) {
         Debugger.__("Sending new value to all neighbors: " + message, this);
-            networkHandler.addOutgoingMessage(message);
+        networkHandler.addOutgoingMessage(message);
     }
 
     private void removeAvailableValueFromBox(int value) {
         if (!isSolved && unusedValues.contains(value)) {
             unusedValues.remove((Integer) value);
-            usedValues.add(value);
             addConstraintToAllCells(value);
         }
     }
@@ -142,7 +201,7 @@ public class SudokuBox {
 
 
     public void receiveKnowledge(String message) {
-        if(isSolved){
+        if (isSolved) {
             return;
         }
         if (message.contains("BOX_")) {
@@ -199,7 +258,7 @@ public class SudokuBox {
                 }
             }
             if (!(forCol || forRow)) {
-                Debugger.__("new knowledge not used - not relevant!",this);
+                Debugger.__("new knowledge not used - not relevant!", this);
             }
 
             fireLocalUpdate();
@@ -259,7 +318,7 @@ public class SudokuBox {
             }
             int x = Integer.parseInt("" + cell.charAt(0));
             int y = Integer.parseInt("" + cell.charAt(1));
-            Debugger.__("Initial Value for cell " + boxCells[x][y].getGlobalCellName() + "  = " + value,this);
+            Debugger.__("Initial Value for cell " + boxCells[x][y].getGlobalCellName() + "  = " + value, this);
             boxCells[x][y].setValue(value);
         }
     }
@@ -342,22 +401,22 @@ public class SudokuBox {
     }
 
 
-    public boolean isSolved(){
+    public boolean isSolved() {
         return isSolved;
     }
 
-    public String printResult(){
-        if(!isSolved) return null;
+    public String printResult() {
+        if (!isSolved) return null;
         StringBuilder stringBuilder = new StringBuilder();
 
-        for (int r = 0; r < boxCells[0].length; r++){
-            for (int c = 0; c < boxCells.length; c++){
-                stringBuilder.append(boxCells[c][r].getValue()+",");
+        for (int r = 0; r < boxCells[0].length; r++) {
+            for (int c = 0; c < boxCells.length; c++) {
+                stringBuilder.append(boxCells[c][r].getValue() + ",");
             }
         }
         String result = stringBuilder.toString();
         //remove last comma
-        result = result.substring(0, (result.length()-1));
+        result = result.substring(0, (result.length() - 1));
         return result;
     }
 

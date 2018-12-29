@@ -75,14 +75,12 @@ public class NetworkHandler extends Thread {
 
     @Override
     public void run() {
-        System.out.println("NetworkHandler of " + sudokuBox.getBoxName() + "run Method!");
         try {
             Thread.sleep(300);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
         while (true) {
-            System.out.println("Process of NetworkHandler " + sudokuBox.getBoxName() + " while true!");
 
             /**
              * 1. Read messages from all incoming connections
@@ -93,9 +91,6 @@ public class NetworkHandler extends Thread {
             if (!sudokuBox.isSolved()) {
                 if (lockForIncomingMessages.tryLock()) {
                     // Got the lock
-                    System.out.println("##############");
-                    System.out.println("GOT THE LOCK!!!!!");
-                    System.out.println("##############");
                     try {
                         for (String message : incomingMessages) {
                             // give message to box
@@ -108,23 +103,18 @@ public class NetworkHandler extends Thread {
                         lockForIncomingMessages.unlock();
                     }
                 }else {
-                    System.out.println("DIDNT GET THE LOCK!!!!!");
-                    System.out.println("DIDNT GET THE LOCK!!!!!");
-                    System.out.println("DIDNT GET THE LOCK!!!!!");
-                    System.out.println("DIDNT GET THE LOCK!!!!!");
-                    System.out.println("DIDNT GET THE LOCK!!!!!");
-                    System.out.println("DIDNT GET THE LOCK!!!!!");
-                    System.out.println("DIDNT GET THE LOCK!!!!!");
+                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
                 }
             } else if (!sentSolvedMessage) {
                 sendIsSolved();
             }
             sendPendingMessages();
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
         }
     }
 
@@ -142,7 +132,7 @@ public class NetworkHandler extends Thread {
                     lockForIncomingMessages.unlock();
                 }
             } else {
-                //TODO Someone else had the lock, abort
+                //Someone else had the lock, abort
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
@@ -244,15 +234,12 @@ public class NetworkHandler extends Thread {
             // Got the first lock
             try {
                 // Process record
-                System.out.println("locked neighborConnections waiting on messages");
                 if (outgoingNeighborConnections.size() == sudokuBox.getNeighborNames().size()) {
 
                     if (lockForOutgoingMessages.tryLock()) {
                         // Got the second lock -> start process
                         try {
                             // Process record
-
-                            System.out.println("locked messages");
                             for (String message : outgoingMessages) {
                                 addKnowledgeToSheet(message);
                                 //Debugger.__("Sending Message: " + message, this);
