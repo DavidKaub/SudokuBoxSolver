@@ -103,9 +103,7 @@ public class SudokuBox {
 
     private void sendNewKnowledgeToNeighbors(String message) {
         Debugger.__("Sending new value to all neighbors: " + message, this);
-        synchronized (networkHandler) {
             networkHandler.addOutgoingMessage(message);
-        }
     }
 
     private void removeAvailableValueFromBox(int value) {

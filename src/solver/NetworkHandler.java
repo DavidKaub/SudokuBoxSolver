@@ -5,6 +5,8 @@ import Initializer.Debugger;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class NetworkHandler extends Thread {
 
@@ -15,38 +17,31 @@ public class NetworkHandler extends Thread {
     private TCPServer tcpServer;
 
     private ManagerConnection managerConnection;
-    private List<NeighborConnection> incomingNeighborConnections;
-    private List<NeighborConnection> outgoingNeighborConnections;
+    private List<NeighborConnection> incomingNeighborConnections = new ArrayList<>();
+    private List<NeighborConnection> outgoingNeighborConnections = new ArrayList<>();
     private int[][] sudokuSheet;
 
-    private List<String> incomingMessages;
-    private List<String> outgoingMessages;
-    private List<String> messageHistory;
+    private List<String> incomingMessages = new ArrayList<>();
+    private List<String> outgoingMessages = new ArrayList<>();
     private int runCounter = 0;
-    private boolean sentSolvedMessage;
+    private boolean sentSolvedMessage = false;
+
+    private Lock lockForIncomingMessages = new ReentrantLock();
+    private Lock lockForOutgoingMessages = new ReentrantLock();
+    private Lock lockForIncomingNeighborConnections = new ReentrantLock();
+    private Lock lockForOutgoingNeighborConnections = new ReentrantLock();
+
 
     public NetworkHandler(SudokuBox sudokuBox, String boxManagerUri, int boxManagerPort) {
         this.sudokuBox = sudokuBox;
         this.boxName = sudokuBox.getBoxName();
         sudokuSheet = new int[10][10];
-        sentSolvedMessage = false;
-
-        incomingNeighborConnections = new ArrayList<>();
-        outgoingNeighborConnections = new ArrayList<>();
-
-        incomingMessages = new ArrayList<>();
-
-        outgoingMessages = new ArrayList<>();
-        messageHistory = new ArrayList<>();
-
         //before establishing connection to remote server (manager) start local server to receive messages when registered
         tcpServer = new TCPServer(this);
         boxUri = tcpServer.getLocalIp();
         boxPort = tcpServer.getLocalPort();
-
         tcpServer.start();
         establishConnectionToManager(boxManagerUri, boxManagerPort);
-        //sudokuBox.sendInitialState();
     }
 
 
@@ -72,8 +67,6 @@ public class NetworkHandler extends Thread {
                 //the neighbor connections should get established during the run method
                 // receiving the data from the server
             }
-
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -89,7 +82,7 @@ public class NetworkHandler extends Thread {
             e.printStackTrace();
         }
         while (true) {
-            System.out.println("NetworkHandler of " + sudokuBox.getBoxName() + "while true!");
+            System.out.println("Process of NetworkHandler " + sudokuBox.getBoxName() + " while true!");
 
             /**
              * 1. Read messages from all incoming connections
@@ -98,14 +91,32 @@ public class NetworkHandler extends Thread {
 
              */
             if (!sudokuBox.isSolved()) {
-                synchronized (incomingMessages) {
-                    for (String message : incomingMessages) {
-                        // give message to box
-                        sudokuBox.receiveKnowledge(message);
+                if (lockForIncomingMessages.tryLock()) {
+                    // Got the lock
+                    System.out.println("##############");
+                    System.out.println("GOT THE LOCK!!!!!");
+                    System.out.println("##############");
+                    try {
+                        for (String message : incomingMessages) {
+                            // give message to box
+                            sudokuBox.receiveKnowledge(message);
+                        }
+                        incomingMessages.clear();
+
+                    } finally {
+                        // Make sure to unlock so that we don't cause a deadlock
+                        lockForIncomingMessages.unlock();
                     }
-                    incomingMessages.clear();
+                }else {
+                    System.out.println("DIDNT GET THE LOCK!!!!!");
+                    System.out.println("DIDNT GET THE LOCK!!!!!");
+                    System.out.println("DIDNT GET THE LOCK!!!!!");
+                    System.out.println("DIDNT GET THE LOCK!!!!!");
+                    System.out.println("DIDNT GET THE LOCK!!!!!");
+                    System.out.println("DIDNT GET THE LOCK!!!!!");
+                    System.out.println("DIDNT GET THE LOCK!!!!!");
                 }
-            }else if(!sentSolvedMessage){
+            } else if (!sentSolvedMessage) {
                 sendIsSolved();
             }
             sendPendingMessages();
@@ -121,20 +132,49 @@ public class NetworkHandler extends Thread {
     void addIncomingMessage(String message) {
         //Debugger.__("received incoming message: " + message + " from neighbor", this);
         if (!sudokuBox.isSolved()) {
-            synchronized (incomingMessages) {
-                incomingMessages.add(message);
+
+            if (lockForIncomingMessages.tryLock()) {
+                // Got the lock
+                try {
+                    incomingMessages.add(message);
+                } finally {
+                    // Make sure to unlock so that we don't cause a deadlock
+                    lockForIncomingMessages.unlock();
+                }
+            } else {
+                //TODO Someone else had the lock, abort
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                //Risiko eines StackOverflow!
+                addIncomingMessage(message);
             }
         }
-
-        synchronized (outgoingMessages) {
-            outgoingMessages.add(message);
-        }
+        addOutgoingMessage(message);
     }
 
     void addOutgoingMessage(String message) {
         // Debugger.__("received outgoing message: " + message + " from box", this);
-        synchronized (outgoingMessages) {
-            outgoingMessages.add(message);
+
+
+        if (lockForOutgoingMessages.tryLock()) {
+            // Got the lock
+            try {
+                outgoingMessages.add(message);
+            } finally {
+                // Make sure to unlock so that we don't cause a deadlock
+                lockForOutgoingMessages.unlock();
+            }
+        } else {
+            // Someone else had the lock, abort
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            addOutgoingMessage(message);
         }
     }
 
@@ -170,11 +210,11 @@ public class NetworkHandler extends Thread {
         return stringBuilder.toString();
     }
 
-    private void sendIsSolved(){
+    private void sendIsSolved() {
         //TODO : RESULT,Boxname,1,4,3,2,6,7,5,9,8
 
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("RESULT,"+sudokuBox.getBoxName()+",");
+        stringBuilder.append("RESULT," + sudokuBox.getBoxName() + ",");
         stringBuilder.append(sudokuBox.printResult().trim());
         try {
             managerConnection.sendMessage(stringBuilder.toString());
@@ -198,48 +238,86 @@ public class NetworkHandler extends Thread {
  * als das versenden einer nachricht. d.h. lieber lokal doppelt prüfen anstatt unnötige naschrichten senden
  *
  */
-        try {
-            Thread.sleep(100);
-            synchronized (outgoingNeighborConnections) {
+
+
+        if (lockForOutgoingNeighborConnections.tryLock()) {
+            // Got the first lock
+            try {
+                // Process record
                 System.out.println("locked neighborConnections waiting on messages");
                 if (outgoingNeighborConnections.size() == sudokuBox.getNeighborNames().size()) {
-                    synchronized (outgoingMessages) {
-                        System.out.println("locked messages");
-                        for (String message : outgoingMessages) {
-                            addKnowledgeToSheet(message);
-                            //Debugger.__("Sending Message: " + message, this);
-                            for (NeighborConnection neighbor : outgoingNeighborConnections) {
-                                try {
-                                    neighbor.sendMessage(message);
-                                } catch (IOException e) {
-                                    e.printStackTrace();
+
+                    if (lockForOutgoingMessages.tryLock()) {
+                        // Got the second lock -> start process
+                        try {
+                            // Process record
+
+                            System.out.println("locked messages");
+                            for (String message : outgoingMessages) {
+                                addKnowledgeToSheet(message);
+                                //Debugger.__("Sending Message: " + message, this);
+                                for (NeighborConnection neighbor : outgoingNeighborConnections) {
+                                    try {
+                                        neighbor.sendMessage(message);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
                                 }
                             }
+                            Debugger.__(sheetToString() + " \nRUN = " + (++runCounter), this);
+                            outgoingMessages.clear();
+                        } finally {
+                            // Make sure to unlock so that we don't cause a deadlock
+                            lockForOutgoingMessages.unlock();
                         }
-                        Debugger.__(sheetToString() + " \nRUN = " + (++runCounter), this);
-                        outgoingMessages.clear();
                     }
                 }
+            } finally {
+                // Make sure to unlock so that we don't cause a deadlock
+                lockForOutgoingNeighborConnections.unlock();
             }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
         }
-
-
     }
 
 
     public void addIncomingNeighborConnection(NeighborConnection neighborConnection) {
-        synchronized (incomingNeighborConnections) {
-            incomingNeighborConnections.add(neighborConnection);
-            neighborConnection.start();
+        if (lockForIncomingNeighborConnections.tryLock()) {
+            // Got the lock
+            try {
+                incomingNeighborConnections.add(neighborConnection);
+                neighborConnection.start();
+            } finally {
+                // Make sure to unlock so that we don't cause a deadlock
+                lockForIncomingNeighborConnections.unlock();
+            }
+        } else {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            addIncomingNeighborConnection(neighborConnection);
+            // Someone else had the lock, abort
         }
     }
 
     public void addOutgoingNeighborConnection(NeighborConnection neighborConnection) {
-        synchronized (outgoingNeighborConnections) {
-            outgoingNeighborConnections.add(neighborConnection);
-            neighborConnection.start();
+        if (lockForOutgoingNeighborConnections.tryLock()) {
+            // Got the lock
+            try {
+                outgoingNeighborConnections.add(neighborConnection);
+                neighborConnection.start();
+            } finally {
+                // Make sure to unlock so that we don't cause a deadlock
+                lockForOutgoingNeighborConnections.unlock();
+            }
+        } else {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            addOutgoingNeighborConnection(neighborConnection);
         }
     }
 

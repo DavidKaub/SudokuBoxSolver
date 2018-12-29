@@ -40,9 +40,7 @@ public class NeighborConnection extends TCPConnection{
                 if (line != null) {
                     line = line.trim();
                     //System.out.println("Received message: " + line);
-                    synchronized (networkHandler){
                         networkHandler.addIncomingMessage(line);
-                    }
                 } else {
                     break;
                 }
