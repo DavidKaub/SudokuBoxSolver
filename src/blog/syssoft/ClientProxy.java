@@ -91,7 +91,7 @@ public class ClientProxy {
         String message = null;
         try {
             message = in.readLine();
-            System.out.printf("ClientProxy receiving \"%s\"\n", message);
+            //System.out.printf("ClientProxy receiving \"%s\"\n", message);
         } catch (Exception e) {
             // fatal(e,"Error while reading");
         }
@@ -128,14 +128,14 @@ public class ClientProxy {
     private void handleClient() {
         while (true) {
             String message = readLine();
-            System.out.printf("ClientProxy for box %s received \"%s\"\n", Name, message);
+            //System.out.printf("ClientProxy for box %s received \"%s\"\n", Name, message);
             message = message.toUpperCase();
             if (!message.startsWith("RESULT,")) {
                 ClientProxy cp = boxMap.get(message);
                 String answer = "Requested box not found";
                 if (cp != null)
                     answer = cp.getAddress() + ',' + cp.getPort();
-                System.out.printf("ClientProxy for box %s sends \"%s\"\n", Name, answer);
+                //System.out.printf("ClientProxy for box %s sends \"%s\"\n", Name, answer);
                 out.println(answer);
             }
             else {

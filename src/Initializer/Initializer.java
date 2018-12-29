@@ -17,6 +17,11 @@ public class Initializer {
         if (!parseArgs(args)) {
             throw new IllegalArgumentException("Wrong Input program terminated");
         }
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         SudokuBox sudokuBox = new SudokuBox(boxName,"localhost",managerUri,managerPort,initValues);
 
 

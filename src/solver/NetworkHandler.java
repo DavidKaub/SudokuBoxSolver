@@ -103,21 +103,35 @@ public class NetworkHandler extends Thread {
                         lockForIncomingMessages.unlock();
                     }
                 }else {
-                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-                    Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+                    noLockNotification();
                 }
             } else if (!sentSolvedMessage) {
                 sendIsSolved();
             }
             sendPendingMessages();
+            try {
+                /**
+                 * TODO why does the system not work if the thread is not sleeping here for a certain time (1 ms does not work)???
+                 *
+                 * NOTE: 10 ms seams to work but 100ms is much faster!!! probably gets even more important when using real
+                 * network and not localhost
+                 */
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
+    private void noLockNotification(){
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+    }
 
     void addIncomingMessage(String message) {
         //Debugger.__("received incoming message: " + message + " from neighbor", this);
@@ -132,6 +146,7 @@ public class NetworkHandler extends Thread {
                     lockForIncomingMessages.unlock();
                 }
             } else {
+                noLockNotification();
                 //Someone else had the lock, abort
                 try {
                     Thread.sleep(1000);
@@ -159,6 +174,7 @@ public class NetworkHandler extends Thread {
             }
         } else {
             // Someone else had the lock, abort
+            noLockNotification();
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
@@ -257,13 +273,15 @@ public class NetworkHandler extends Thread {
                             // Make sure to unlock so that we don't cause a deadlock
                             lockForOutgoingMessages.unlock();
                         }
-                    }
+                    }else
+                        noLockNotification();
                 }
             } finally {
                 // Make sure to unlock so that we don't cause a deadlock
                 lockForOutgoingNeighborConnections.unlock();
             }
-        }
+        }else
+            noLockNotification();
     }
 
 
@@ -278,6 +296,7 @@ public class NetworkHandler extends Thread {
                 lockForIncomingNeighborConnections.unlock();
             }
         } else {
+            noLockNotification();
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
@@ -299,6 +318,7 @@ public class NetworkHandler extends Thread {
                 lockForOutgoingNeighborConnections.unlock();
             }
         } else {
+            noLockNotification();
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {

@@ -18,8 +18,6 @@ public class SudokuBox {
     private SudokuCell[][] boxCells;
     private boolean isSolved = false;
 
-    //TODO potential solving optimization with map?
-    private Map<Integer, List<SudokuCell>> potentialNumberPositions = new HashMap<>();
 
 
     public SudokuBox(String boxName, String uri, String boxManagerUri, int boxManagerPort, String initialValues) {
@@ -35,11 +33,6 @@ public class SudokuBox {
         row = Integer.parseInt("" + boxColRow.charAt(1));
 
 
-        //Initialize Map
-        for (int i = 1; i <= 9; i++) {
-            potentialNumberPositions.put(i, new ArrayList<>());
-        }
-
 
         initializeCells();
 
@@ -53,11 +46,7 @@ public class SudokuBox {
         sendInitialState();
     }
 
-    private void clearMapLists() {
-        for (int i = 1; i <= 9; i++) {
-            potentialNumberPositions.get((Integer) i).clear();
-        }
-    }
+
 
 
     public void fireLocalUpdate() {
@@ -68,53 +57,14 @@ public class SudokuBox {
              * If a number is only counted once -> the cell can be solved
              */
 
-            //1. part of "smart" solving
-            clearMapLists();
-            //end 1 part
-
             for (int i = 0; i < boxCells.length; i++) {
                 for (int j = 0; j < boxCells[i].length; j++) {
                     SudokuCell cell = boxCells[i][j];
-
                     if (cell.isSolved() && unusedValues.contains(cell.getValue())) {
                         removeAvailableValueFromBox(cell.getValue());
                     }
-
-                    //2. part of "smart" solving
-                    if (!cell.isSolved() && unusedValues.size() > 1) {
-                        /**
-                         * wir haben hier eine Map die für jeden möglichen Wert die besetzbaren Zellen speichert (in einer Liste)
-                         * Wenn eine der Listen die Länge 1 hat kann der Wert gesetzt werden ( ein Wert kann nur an einer
-                         * bestimmten stelle gesetzt werden (!= eine Zelle kann nur noch einen bestimmten wert haben))
-                         *
-                         * Koennte noch optimeirt werden wenn man außer der Box noch die Constraints angrenzender Boxen bzw. der
-                         * korrespondierenden Reiehen und spalten berücksichjtrigt
-                         *
-                         */
-
-                        for(Integer val: cell.getPotetialFits()){
-                            potentialNumberPositions.get((Integer) val).add(cell);
-                        }
-                    }
-                    //end 2 part
                 }
             }
-
-            //3. part of "smart" solving
-            if (unusedValues.size() > 1) {
-                for(Map.Entry<Integer, List<SudokuCell>> entry : potentialNumberPositions.entrySet()) {
-                    List<SudokuCell> list = entry.getValue();
-                    if(list.size() == 1){
-                        Integer key = entry.getKey();
-                        SudokuCell localCell = list.get(0);
-                        System.out.println("Found Value: "+key + " for cell "+localCell.getGlobalCellName());
-                        System.out.println("Existing Potential Values = ");
-                        System.out.println(localCell.getPotetialFits().toString());
-                        //System.exit(0);
-                    }
-                }
-            }
-            //end of 3. part
 
             if (unusedValues.size() == 1) {
                 /**
