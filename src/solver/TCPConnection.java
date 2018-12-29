@@ -1,5 +1,7 @@
 package solver;
 
+import Initializer.Debugger;
+
 import java.io.*;
 import java.net.Socket;
 
@@ -16,7 +18,7 @@ public class TCPConnection extends Thread {
         try {
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            System.out.println("Connection established using ip: "+socket.getRemoteSocketAddress()+ " and port: "+socket.getPort());
+            Debugger.__("Connection established using ip: "+socket.getRemoteSocketAddress()+ " and port: "+socket.getPort(),this);
         } catch (IOException e) {
             e.printStackTrace();
         }
