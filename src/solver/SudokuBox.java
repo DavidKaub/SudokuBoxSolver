@@ -4,42 +4,23 @@ import Initializer.Debugger;
 
 import java.util.*;
 
-public class SudokuBox {
+abstract class SudokuBox {
 
-    private String boxName;
-    private String boxUri;
-    private char column;
-    private int row;
+    protected String boxName;
+    protected char column;
+    protected int row;
 
-    private List<String> neighborNames = new ArrayList<>();
-    private List<Integer> unusedValues = new ArrayList<>();
+    protected List<String> neighborNames = new ArrayList<>();
+    protected List<Integer> unusedValues = new ArrayList<>();
 
-    private NetworkHandler networkHandler;
-    private SudokuCell[][] boxCells;
-    private boolean isSolved = false;
-
-
-
-    public SudokuBox(String boxName, String uri, String boxManagerUri, int boxManagerPort, String initialValues) {
-        this.boxName = boxName;
-        this.boxUri = uri;
-
-        unusedValues.addAll(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9));
-        StringTokenizer stringTokenizer = new StringTokenizer(boxName, "_");
-        stringTokenizer.nextToken();
-        String boxColRow = stringTokenizer.nextToken();
-        column = boxColRow.charAt(0);
-        column = Character.toUpperCase(column);
-        row = Integer.parseInt("" + boxColRow.charAt(1));
+    protected NetworkHandler networkHandler;
+    protected SudokuCell[][] boxCells;
+    protected boolean isSolved = false;
 
 
 
+    public SudokuBox() {
         initializeCells();
-
-        networkHandler = new NetworkHandler(this, boxManagerUri, boxManagerPort);
-        networkHandler.start();
-
-        setInitialValues(initialValues);
         Debugger.__("initialized!", this);
         Debugger.__(this.toString(), this);
         fireLocalUpdate();
@@ -256,7 +237,7 @@ public class SudokuBox {
     }
 
 
-    private void setInitialValues(String initialValues) {
+    protected void setInitialValues(String initialValues) {
         StringTokenizer stringTokenizer = new StringTokenizer(initialValues, ", :");
 
         while (stringTokenizer.hasMoreTokens()) {
@@ -313,10 +294,6 @@ public class SudokuBox {
             neighborNames.add("BOX_" + column + r);
         }
         return neighborNames;
-    }
-
-    public String getBoxUri() {
-        return boxUri;
     }
 
     public char getColumn() {

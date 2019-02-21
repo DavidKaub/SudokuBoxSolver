@@ -8,68 +8,27 @@ import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class NetworkHandler extends Thread {
+abstract class NetworkHandler extends Thread {
 
-    private SudokuBox sudokuBox;
-    private String boxName;
-    private String boxUri;
-    private int boxPort;
-    private TCPServer tcpServer;
+    protected SudokuBox sudokuBox;
+    protected String boxName;
+    protected List<String> incomingMessages = new ArrayList<>();
+    protected List<String> outgoingMessages = new ArrayList<>();
+    protected int runCounter = 0;
+    protected boolean sentSolvedMessage = false;
+    protected int[][] sudokuSheet;
 
-    private ManagerConnection managerConnection;
-    private List<NeighborConnection> incomingNeighborConnections = new ArrayList<>();
-    private List<NeighborConnection> outgoingNeighborConnections = new ArrayList<>();
-    private int[][] sudokuSheet;
-
-    private List<String> incomingMessages = new ArrayList<>();
-    private List<String> outgoingMessages = new ArrayList<>();
-    private int runCounter = 0;
-    private boolean sentSolvedMessage = false;
-
-    private Lock lockForIncomingMessages = new ReentrantLock();
-    private Lock lockForOutgoingMessages = new ReentrantLock();
-    private Lock lockForIncomingNeighborConnections = new ReentrantLock();
-    private Lock lockForOutgoingNeighborConnections = new ReentrantLock();
+    protected Lock lockForIncomingMessages = new ReentrantLock();
+    protected Lock lockForOutgoingMessages = new ReentrantLock();
 
 
-    public NetworkHandler(SudokuBox sudokuBox, String boxManagerUri, int boxManagerPort) {
+
+
+    public NetworkHandler(SudokuBox sudokuBox) {
         this.sudokuBox = sudokuBox;
         this.boxName = sudokuBox.getBoxName();
         sudokuSheet = new int[10][10];
-        //before establishing connection to remote server (manager) start local server to receive messages when registered
-        tcpServer = new TCPServer(this);
-        boxUri = tcpServer.getLocalIp();
-        boxPort = tcpServer.getLocalPort();
-        tcpServer.start();
-        establishConnectionToManager(boxManagerUri, boxManagerPort);
-    }
-
-
-    private void establishConnectionToManager(String boxManagerUri, int boxManagerPort) {
-        try {
-            System.out.println("establishing connection to boxManager: " + boxManagerUri + ":" + boxManagerPort);
-            this.managerConnection = new ManagerConnection(this, boxManagerUri, boxManagerPort, boxUri, boxPort);
-            /**
-             * TODO Should logon server and ask for neighbor adresses! asap
-             * when all neighbor connections are established the sudokubox is beeing
-             * "started"! i.e. messages are sent and received
-             *
-             */
-            managerConnection.start();
-            managerConnection.registerOnManager();
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            for (String neighborName : sudokuBox.getNeighborNames()) {
-                managerConnection.sendMessage(neighborName);
-                //the neighbor connections should get established during the run method
-                // receiving the data from the server
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        establishConnectionToManager();
     }
 
 
@@ -123,17 +82,15 @@ public class NetworkHandler extends Thread {
         }
     }
 
-    private void noLockNotification(){
-        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
-    }
 
-    void addIncomingMessage(String message) {
+
+
+    abstract void establishConnectionToManager();
+
+
+
+
+    protected void addIncomingMessage(String message) {
         //Debugger.__("received incoming message: " + message + " from neighbor", this);
         if (!sudokuBox.isSolved()) {
 
@@ -160,7 +117,7 @@ public class NetworkHandler extends Thread {
         addOutgoingMessage(message);
     }
 
-    void addOutgoingMessage(String message) {
+    protected void addOutgoingMessage(String message) {
         // Debugger.__("received outgoing message: " + message + " from box", this);
 
 
@@ -185,7 +142,7 @@ public class NetworkHandler extends Thread {
     }
 
 
-    private void addKnowledgeToSheet(String message) {
+    protected void addKnowledgeToSheet(String message) {
         char col = message.charAt(0);
         int column = 1 + (col - 'A');
         int row = Integer.parseInt("" + message.charAt(1));
@@ -193,7 +150,7 @@ public class NetworkHandler extends Thread {
         sudokuSheet[column][row] = value;
     }
 
-    private String sheetToString() {
+    protected String sheetToString() {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("SudokuSheet of " + sudokuBox.getBoxName() + ":\n");
 
@@ -216,117 +173,23 @@ public class NetworkHandler extends Thread {
         return stringBuilder.toString();
     }
 
-    private void sendIsSolved() {
-        //TODO : RESULT,Boxname,1,4,3,2,6,7,5,9,8
+    abstract void sendIsSolved();
 
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("RESULT," + sudokuBox.getBoxName() + ",");
-        stringBuilder.append(sudokuBox.printResult().trim());
-        try {
-            managerConnection.sendMessage(stringBuilder.toString());
-            sentSolvedMessage = true;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    protected void noLockNotification(){
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
+        Debugger.__("DIDNT GET THE LOCK!!!!!",this);
     }
 
 
-    private void sendPendingMessages() {
-        //Debugger.__("SENDING PENDING MESSAGES\nSENDING PENDING MESSAGES\nSENDING PENDING MESSAGES\nSENDING PENDING MESSAGES\nSENDING PENDING MESSAGES", this);
-/**
- * TODO Design
- * in den ausgehgenden Verbindungen wird nochmals überprüft ob die nachrtichte bereits versendet wurde
- * Wenn wir hier dieser Prüfung nicht stattfindet aber dafür in den einzelnen ist zwar der aufwand größer
- * aber es kann auch ermöglicht werden (eher jedenfalls) dass während des prozesses einzelne Boxen ausgetauscht werden
- *
- * edit: das zentrale speichern der versendeten nachrichten ist sinvoll bzw notwendig um ggf die nachrichten nochmals
- * zu versenden. Außerdem ist in der regal für die performance des systems ein lokaler zugriff deutlich günstiger
- * als das versenden einer nachricht. d.h. lieber lokal doppelt prüfen anstatt unnötige naschrichten senden
- *
- */
+    abstract void sendPendingMessages();
 
 
-        if (lockForOutgoingNeighborConnections.tryLock()) {
-            // Got the first lock
-            try {
-                // Process record
-                if (outgoingNeighborConnections.size() == sudokuBox.getNeighborNames().size()) {
 
-                    if (lockForOutgoingMessages.tryLock()) {
-                        // Got the second lock -> start process
-                        try {
-                            // Process record
-                            for (String message : outgoingMessages) {
-                                addKnowledgeToSheet(message);
-                                //Debugger.__("Sending Message: " + message, this);
-                                for (NeighborConnection neighbor : outgoingNeighborConnections) {
-                                    try {
-                                        neighbor.sendMessage(message);
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
-                                }
-                            }
-                            Debugger.__(sheetToString() + " \nRUN = " + (++runCounter), this);
-                            outgoingMessages.clear();
-                        } finally {
-                            // Make sure to unlock so that we don't cause a deadlock
-                            lockForOutgoingMessages.unlock();
-                        }
-                    }else
-                        noLockNotification();
-                }
-            } finally {
-                // Make sure to unlock so that we don't cause a deadlock
-                lockForOutgoingNeighborConnections.unlock();
-            }
-        }else
-            noLockNotification();
-    }
-
-
-    public void addIncomingNeighborConnection(NeighborConnection neighborConnection) {
-        if (lockForIncomingNeighborConnections.tryLock()) {
-            // Got the lock
-            try {
-                incomingNeighborConnections.add(neighborConnection);
-                neighborConnection.start();
-            } finally {
-                // Make sure to unlock so that we don't cause a deadlock
-                lockForIncomingNeighborConnections.unlock();
-            }
-        } else {
-            noLockNotification();
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            addIncomingNeighborConnection(neighborConnection);
-            // Someone else had the lock, abort
-        }
-    }
-
-    public void addOutgoingNeighborConnection(NeighborConnection neighborConnection) {
-        if (lockForOutgoingNeighborConnections.tryLock()) {
-            // Got the lock
-            try {
-                outgoingNeighborConnections.add(neighborConnection);
-                neighborConnection.start();
-            } finally {
-                // Make sure to unlock so that we don't cause a deadlock
-                lockForOutgoingNeighborConnections.unlock();
-            }
-        } else {
-            noLockNotification();
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            addOutgoingNeighborConnection(neighborConnection);
-        }
-    }
 
 
     public String getBoxName() {

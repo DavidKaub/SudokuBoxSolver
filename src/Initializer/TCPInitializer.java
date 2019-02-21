@@ -1,11 +1,10 @@
 package Initializer;
 
-
-import solver.SudokuBox;
+import solver.TCP_BOX;
 
 import java.util.StringTokenizer;
 
-public class Initializer {
+public class TCPInitializer {
 
     private static String managerUri = "localhost";
     private static int managerPort = 4242;
@@ -22,7 +21,7 @@ public class Initializer {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        SudokuBox sudokuBox = new SudokuBox(boxName,"localhost",managerUri,managerPort,initValues);
+        TCP_BOX sudokuBox = new TCP_BOX(boxName,"localhost",managerUri,managerPort,initValues);
 
 
     }
